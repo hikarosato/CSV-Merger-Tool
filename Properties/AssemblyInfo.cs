@@ -8,11 +8,11 @@ using System.Windows;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("CSV Merger Tool")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Програма для об’єднання перекладу з новим файлом для Unreal Engine")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Hikaro")]
 [assembly: AssemblyProduct("CSV Merger Tool")]
-[assembly: AssemblyCopyright("Copyright © Hikaro 2025")]
+[assembly: AssemblyCopyright("Copyright © 2025 Hikaro ")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -48,5 +48,5 @@ using System.Windows;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("1.1")]
-[assembly: AssemblyFileVersion("1.1")]
+[assembly: AssemblyVersion("1.2")]
+[assembly: AssemblyFileVersion("1.2")]

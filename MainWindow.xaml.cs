@@ -51,7 +51,7 @@ namespace CSV_Merger_Tool
                 {
                     e.Effects = DragDropEffects.None;
                     border.BorderBrush = Brushes.Gray;
-                    border.Background = Brushes.WhiteSmoke;
+                    border.Background = (SolidColorBrush)new BrushConverter().ConvertFrom("#FAFAFA");
                 }
             }
             else
@@ -132,7 +132,7 @@ namespace CSV_Merger_Tool
             if (string.IsNullOrEmpty(filePath))
             {
                 border.BorderBrush = Brushes.Gray;
-                border.Background = Brushes.WhiteSmoke;
+                border.Background = (SolidColorBrush)new BrushConverter().ConvertFrom("#FAFAFA");
             }
             else
             {
@@ -172,20 +172,32 @@ namespace CSV_Merger_Tool
             newCsvPath = null;
             TxtNewCsv.Text = "Перетягніть новий CSV";
             borderNew.BorderBrush = Brushes.Gray;
-            borderNew.Background = Brushes.WhiteSmoke;
+            borderNew.Background = (SolidColorBrush)new BrushConverter().ConvertFrom("#FAFAFA");
             UpdateMergeButton();
         }
 
         private void BtnClearOld_Click(object sender, RoutedEventArgs e)
         {
             oldCsvPath = null;
-            TxtOldCsv.Text = "Перетягніть старий CSV";
+            TxtOldCsv.Text = "Перетягніть старий CSV із перекладом";
             borderOld.BorderBrush = Brushes.Gray;
-            borderOld.Background = Brushes.WhiteSmoke;
+            borderNew.Background = (SolidColorBrush)new BrushConverter().ConvertFrom("#FAFAFA");
             UpdateMergeButton();
         }
 
         private void BtnMerge_Click(object sender, RoutedEventArgs e)
+        {
+            if (RbModeID.IsChecked == true)
+            {
+                MergeByID();
+            }
+            else if (RbModeText.IsChecked == true)
+            {
+                MergeByText();
+            }
+        }
+
+        private void MergeByID()
         {
             try
             {
@@ -204,7 +216,7 @@ namespace CSV_Merger_Tool
                 var config = new CsvConfiguration(CultureInfo.InvariantCulture)
                 {
                     Encoding = Encoding.UTF8,
-                    PrepareHeaderForMatch = args => args.Header.Trim(),
+                    PrepareHeaderForMatch = args => args.Header,
                     ShouldQuote = _ => true,
                     MissingFieldFound = null,
                     BadDataFound = null
@@ -220,13 +232,13 @@ namespace CSV_Merger_Tool
 
                     if (!headerRecord.Contains("key", StringComparer.OrdinalIgnoreCase))
                     {
-                        MessageBox.Show("Старий CSV не містить колонку 'key'!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show("Старий CSV не містить колонку key!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
 
                     while (csv.Read())
                     {
-                        string key = csv.GetField("key")?.Trim();
+                        string key = csv.GetField("key");
                         string source = csv.GetField("source");
 
                         if (!string.IsNullOrWhiteSpace(key))
@@ -239,7 +251,7 @@ namespace CSV_Merger_Tool
                 SaveFileDialog saveDlg = new SaveFileDialog
                 {
                     Filter = "CSV Files (*.csv)|*.csv",
-                    FileName = "merged.csv"
+                    FileName = "merged_by_ID.csv"
                 };
 
                 if (saveDlg.ShowDialog() != true) return;
@@ -255,7 +267,7 @@ namespace CSV_Merger_Tool
 
                     if (!headers.Contains("key", StringComparer.OrdinalIgnoreCase))
                     {
-                        MessageBox.Show("Новий CSV не містить колонку 'key'!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show("Новий CSV не містить колонку key!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
 
@@ -274,7 +286,7 @@ namespace CSV_Merger_Tool
                             record[header] = csvReader.GetField(header) ?? string.Empty;
                         }
 
-                        string key = record.ContainsKey("key") ? record["key"]?.Trim() : null;
+                        string key = record.ContainsKey("key") ? record["key"] : null;
                         string sourceNew = record.ContainsKey("source") ? record["source"] : null;
 
                         if (!string.IsNullOrWhiteSpace(key) && oldData.ContainsKey(key))
@@ -295,7 +307,142 @@ namespace CSV_Merger_Tool
                     }
 
                     MessageBox.Show(
-                        $"Перенесено рядків: {updatedCount}\nФайл збережено.",
+                        $"Режим: за ID.\nПеренесено рядків: {updatedCount}\nФайл успішно збережено.",
+                        "Успіх", MessageBoxButton.OK);
+                }
+            }
+            catch (IOException ex)
+            {
+                MessageBox.Show($"Помилка читання/запису файлу:\n{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (CsvHelperException ex)
+            {
+                MessageBox.Show($"Помилка обробки CSV:\n{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void MergeByText()
+        {
+            try
+            {
+                if (!File.Exists(newCsvPath))
+                {
+                    MessageBox.Show("Новий CSV файл не знайдено!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                if (!File.Exists(oldCsvPath))
+                {
+                    MessageBox.Show("Старий CSV файл не знайдено!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+                {
+                    Encoding = Encoding.UTF8,
+                    PrepareHeaderForMatch = args => args.Header,
+                    ShouldQuote = _ => true,
+                    MissingFieldFound = null,
+                    BadDataFound = null
+                };
+
+                var oldTranslations = new Dictionary<string, string>(StringComparer.Ordinal);
+                using (var reader = new StreamReader(oldCsvPath, Encoding.UTF8))
+                using (var csv = new CsvReader(reader, config))
+                {
+                    csv.Read();
+                    csv.ReadHeader();
+                    var headerRecord = csv.HeaderRecord;
+
+                    if (!headerRecord.Contains("source", StringComparer.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show("Старий CSV не містить колонку source!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
+                    if (!headerRecord.Contains("Translation", StringComparer.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show("Старий CSV не містить колонку Translation!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
+                    while (csv.Read())
+                    {
+                        string source = csv.GetField("source");
+                        string translation = csv.GetField("Translation");
+
+                        if (!string.IsNullOrWhiteSpace(source))
+                        {
+                            oldTranslations[source] = translation ?? string.Empty;
+                        }
+                    }
+                }
+
+                SaveFileDialog saveDlg = new SaveFileDialog
+                {
+                    Filter = "CSV Files (*.csv)|*.csv",
+                    FileName = "merged_by_text.csv"
+                };
+
+                if (saveDlg.ShowDialog() != true) return;
+
+                using (var reader = new StreamReader(newCsvPath, Encoding.UTF8))
+                using (var csvReader = new CsvReader(reader, config))
+                using (var writer = new StreamWriter(saveDlg.FileName, false, new UTF8Encoding(false)))
+                using (var csvWriter = new CsvWriter(writer, config))
+                {
+                    csvReader.Read();
+                    csvReader.ReadHeader();
+                    var headers = csvReader.HeaderRecord;
+
+                    if (!headers.Contains("source", StringComparer.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show("Новий CSV не містить колонку source!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
+                    if (!headers.Contains("Translation", StringComparer.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show("Новий CSV не містить колонку Translation!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
+                    foreach (var h in headers)
+                        csvWriter.WriteField(h);
+                    csvWriter.NextRecord();
+
+                    int updatedCount = 0;
+
+                    while (csvReader.Read())
+                    {
+                        var record = new Dictionary<string, string>();
+
+                        foreach (var header in headers)
+                        {
+                            record[header] = csvReader.GetField(header) ?? string.Empty;
+                        }
+
+                        string source = record.ContainsKey("source") ? record["source"] : null;
+
+                        if (!string.IsNullOrWhiteSpace(source) && oldTranslations.ContainsKey(source))
+                        {
+                            record["Translation"] = oldTranslations[source];
+                            updatedCount++;
+                        }
+
+                        foreach (var h in headers)
+                        {
+                            csvWriter.WriteField(record.ContainsKey(h) ? record[h] : string.Empty);
+                        }
+                        csvWriter.NextRecord();
+                    }
+
+                    MessageBox.Show(
+                        $"Режим: за оригінальним текстом.\nПеренесено рядків: {updatedCount}\nФайл успішно збережено.",
                         "Успіх",
                         MessageBoxButton.OK);
                 }
@@ -310,7 +457,7 @@ namespace CSV_Merger_Tool
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Несподівана помилка:\n{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
