@@ -5,9 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace CSV_Merger_Tool
 {
@@ -20,6 +22,7 @@ namespace CSV_Merger_Tool
         {
             InitializeComponent();
         }
+
         private void UpdateMergeButton()
         {
             BtnClearNew.IsEnabled = !string.IsNullOrEmpty(newCsvPath);
@@ -29,31 +32,33 @@ namespace CSV_Merger_Tool
 
         private void HandleDrag(object sender, DragEventArgs e)
         {
-            Border border = sender as Border;
-            if (border == null) return;
+            if (!(sender is Border border)) return;
 
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files == null || files.Length == 0) return;
+
                 string file = files[0];
 
                 if (Path.GetExtension(file)?.ToLower() == ".csv")
                 {
                     e.Effects = DragDropEffects.Copy;
-                    border.BorderBrush = System.Windows.Media.Brushes.DodgerBlue;
-                    border.Background = System.Windows.Media.Brushes.AliceBlue;
+                    border.BorderBrush = Brushes.DodgerBlue;
+                    border.Background = Brushes.AliceBlue;
                 }
                 else
                 {
                     e.Effects = DragDropEffects.None;
-                    border.BorderBrush = System.Windows.Media.Brushes.Gray;
-                    border.Background = System.Windows.Media.Brushes.WhiteSmoke;
+                    border.BorderBrush = Brushes.Gray;
+                    border.Background = Brushes.WhiteSmoke;
                 }
             }
             else
             {
                 e.Effects = DragDropEffects.None;
             }
+            e.Handled = true;
         }
 
         private void NewCsv_Drop(object sender, DragEventArgs e)
@@ -61,17 +66,20 @@ namespace CSV_Merger_Tool
             if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
 
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files == null || files.Length == 0) return;
+
             string file = files[0];
 
             if (Path.GetExtension(file)?.ToLower() != ".csv")
             {
+                ResetBorderStyle(borderNew, newCsvPath);
                 return;
             }
 
             if (sender is Border border)
             {
-                border.BorderBrush = System.Windows.Media.Brushes.DodgerBlue;
-                border.Background = System.Windows.Media.Brushes.AliceBlue;
+                border.BorderBrush = Brushes.DodgerBlue;
+                border.Background = Brushes.AliceBlue;
             }
 
             newCsvPath = file;
@@ -84,17 +92,20 @@ namespace CSV_Merger_Tool
             if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
 
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files == null || files.Length == 0) return;
+
             string file = files[0];
 
             if (Path.GetExtension(file)?.ToLower() != ".csv")
             {
+                ResetBorderStyle(borderOld, oldCsvPath);
                 return;
             }
 
             if (sender is Border border)
             {
-                border.BorderBrush = System.Windows.Media.Brushes.DodgerBlue;
-                border.Background = System.Windows.Media.Brushes.AliceBlue;
+                border.BorderBrush = Brushes.DodgerBlue;
+                border.Background = Brushes.AliceBlue;
             }
 
             oldCsvPath = file;
@@ -107,14 +118,26 @@ namespace CSV_Merger_Tool
 
         private void Border_DragLeave(object sender, DragEventArgs e)
         {
-            if (sender is Border b)
+            if (sender is Border border)
             {
-                if ((b == borderNew && string.IsNullOrEmpty(newCsvPath)) ||
-                    (b == borderOld && string.IsNullOrEmpty(oldCsvPath)))
-                {
-                    b.BorderBrush = System.Windows.Media.Brushes.Gray;
-                    b.Background = System.Windows.Media.Brushes.WhiteSmoke;
-                }
+                if (border == borderNew)
+                    ResetBorderStyle(borderNew, newCsvPath);
+                else if (border == borderOld)
+                    ResetBorderStyle(borderOld, oldCsvPath);
+            }
+        }
+
+        private void ResetBorderStyle(Border border, string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                border.BorderBrush = Brushes.Gray;
+                border.Background = Brushes.WhiteSmoke;
+            }
+            else
+            {
+                border.BorderBrush = Brushes.DodgerBlue;
+                border.Background = Brushes.AliceBlue;
             }
         }
 
@@ -125,8 +148,8 @@ namespace CSV_Merger_Tool
             {
                 newCsvPath = dlg.FileName;
                 TxtNewCsv.Text = $"Новий: {Path.GetFileName(newCsvPath)}";
-                borderNew.BorderBrush = System.Windows.Media.Brushes.DodgerBlue;
-                borderNew.Background = System.Windows.Media.Brushes.AliceBlue;
+                borderNew.BorderBrush = Brushes.DodgerBlue;
+                borderNew.Background = Brushes.AliceBlue;
                 UpdateMergeButton();
             }
         }
@@ -138,8 +161,8 @@ namespace CSV_Merger_Tool
             {
                 oldCsvPath = dlg.FileName;
                 TxtOldCsv.Text = $"Старий: {Path.GetFileName(oldCsvPath)}";
-                borderOld.BorderBrush = System.Windows.Media.Brushes.DodgerBlue;
-                borderOld.Background = System.Windows.Media.Brushes.AliceBlue;
+                borderOld.BorderBrush = Brushes.DodgerBlue;
+                borderOld.Background = Brushes.AliceBlue;
                 UpdateMergeButton();
             }
         }
@@ -148,8 +171,8 @@ namespace CSV_Merger_Tool
         {
             newCsvPath = null;
             TxtNewCsv.Text = "Перетягніть новий CSV";
-            borderNew.BorderBrush = System.Windows.Media.Brushes.Gray;
-            borderNew.Background = System.Windows.Media.Brushes.WhiteSmoke;
+            borderNew.BorderBrush = Brushes.Gray;
+            borderNew.Background = Brushes.WhiteSmoke;
             UpdateMergeButton();
         }
 
@@ -157,8 +180,8 @@ namespace CSV_Merger_Tool
         {
             oldCsvPath = null;
             TxtOldCsv.Text = "Перетягніть старий CSV";
-            borderOld.BorderBrush = System.Windows.Media.Brushes.Gray;
-            borderOld.Background = System.Windows.Media.Brushes.WhiteSmoke;
+            borderOld.BorderBrush = Brushes.Gray;
+            borderOld.Background = Brushes.WhiteSmoke;
             UpdateMergeButton();
         }
 
@@ -166,29 +189,59 @@ namespace CSV_Merger_Tool
         {
             try
             {
+                if (!File.Exists(newCsvPath))
+                {
+                    MessageBox.Show("Новий CSV файл не знайдено!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                if (!File.Exists(oldCsvPath))
+                {
+                    MessageBox.Show("Старий CSV файл не знайдено!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
                 var config = new CsvConfiguration(CultureInfo.InvariantCulture)
                 {
                     Encoding = Encoding.UTF8,
                     PrepareHeaderForMatch = args => args.Header.Trim(),
-                    ShouldQuote = _ => true
+                    ShouldQuote = _ => true,
+                    MissingFieldFound = null,
+                    BadDataFound = null
                 };
 
-                var oldData = new Dictionary<string, string>();
+                var oldData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 using (var reader = new StreamReader(oldCsvPath, Encoding.UTF8))
                 using (var csv = new CsvReader(reader, config))
                 {
                     csv.Read();
                     csv.ReadHeader();
+                    var headerRecord = csv.HeaderRecord;
+
+                    if (!headerRecord.Contains("key", StringComparer.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show("Старий CSV не містить колонку 'key'!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
                     while (csv.Read())
                     {
-                        var record = csv.GetRecord<dynamic>() as IDictionary<string, object>;
-                        string key = record["key"]?.ToString().Trim();
-                        string source = record["source"]?.ToString();
-                        if (key != null) oldData[key] = source;
+                        string key = csv.GetField("key")?.Trim();
+                        string source = csv.GetField("source");
+
+                        if (!string.IsNullOrWhiteSpace(key))
+                        {
+                            oldData[key] = source ?? string.Empty;
+                        }
                     }
                 }
 
-                SaveFileDialog saveDlg = new SaveFileDialog { Filter = "CSV Files (*.csv)|*.csv" };
+                SaveFileDialog saveDlg = new SaveFileDialog
+                {
+                    Filter = "CSV Files (*.csv)|*.csv",
+                    FileName = "merged.csv"
+                };
+
                 if (saveDlg.ShowDialog() != true) return;
 
                 using (var reader = new StreamReader(newCsvPath, Encoding.UTF8))
@@ -198,36 +251,66 @@ namespace CSV_Merger_Tool
                 {
                     csvReader.Read();
                     csvReader.ReadHeader();
-                    var headers = csvReader.Context.Reader.HeaderRecord;
+                    var headers = csvReader.HeaderRecord;
+
+                    if (!headers.Contains("key", StringComparer.OrdinalIgnoreCase))
+                    {
+                        MessageBox.Show("Новий CSV не містить колонку 'key'!", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
 
                     foreach (var h in headers)
                         csvWriter.WriteField(h);
                     csvWriter.NextRecord();
 
+                    int updatedCount = 0;
+
                     while (csvReader.Read())
                     {
-                        var record = csvReader.GetRecord<dynamic>() as IDictionary<string, object>;
-                        string key = record["key"]?.ToString().Trim();
-                        string sourceNew = record["source"]?.ToString();
+                        var record = new Dictionary<string, string>();
 
-                        if (key != null && oldData.ContainsKey(key))
+                        foreach (var header in headers)
+                        {
+                            record[header] = csvReader.GetField(header) ?? string.Empty;
+                        }
+
+                        string key = record.ContainsKey("key") ? record["key"]?.Trim() : null;
+                        string sourceNew = record.ContainsKey("source") ? record["source"] : null;
+
+                        if (!string.IsNullOrWhiteSpace(key) && oldData.ContainsKey(key))
                         {
                             string sourceOld = oldData[key];
-                            if (sourceNew != sourceOld)
+                            if (sourceNew != sourceOld && record.ContainsKey("Translation"))
+                            {
                                 record["Translation"] = sourceOld;
+                                updatedCount++;
+                            }
                         }
 
                         foreach (var h in headers)
-                            csvWriter.WriteField(record.ContainsKey(h) ? record[h] : "");
+                        {
+                            csvWriter.WriteField(record.ContainsKey(h) ? record[h] : string.Empty);
+                        }
                         csvWriter.NextRecord();
                     }
-                }
 
-                MessageBox.Show("Переклади зі старого CSV успішно перенесені у новий файл!", "Готово", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(
+                        $"Перенесено рядків: {updatedCount}\nФайл збережено.",
+                        "Успіх",
+                        MessageBoxButton.OK);
+                }
+            }
+            catch (IOException ex)
+            {
+                MessageBox.Show($"Помилка читання/запису файлу:\n{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (CsvHelperException ex)
+            {
+                MessageBox.Show($"Помилка обробки CSV:\n{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Несподівана помилка:\n{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
