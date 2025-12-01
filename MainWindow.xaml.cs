@@ -292,7 +292,7 @@ namespace CSV_Merger_Tool
                         if (!string.IsNullOrWhiteSpace(key) && oldData.ContainsKey(key))
                         {
                             string sourceOld = oldData[key];
-                            if (sourceNew != sourceOld && record.ContainsKey("Translation"))
+                            if (!string.IsNullOrWhiteSpace(sourceOld) && sourceNew != sourceOld && record.ContainsKey("Translation"))
                             {
                                 record["Translation"] = sourceOld;
                                 updatedCount++;
@@ -430,8 +430,12 @@ namespace CSV_Merger_Tool
 
                         if (!string.IsNullOrWhiteSpace(source) && oldTranslations.ContainsKey(source))
                         {
-                            record["Translation"] = oldTranslations[source];
-                            updatedCount++;
+                            string oldTranslation = oldTranslations[source];
+                            if (!string.IsNullOrWhiteSpace(oldTranslation))
+                            {
+                                record["Translation"] = oldTranslation;
+                                updatedCount++;
+                            }
                         }
 
                         foreach (var h in headers)
