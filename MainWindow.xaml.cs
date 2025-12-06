@@ -23,6 +23,7 @@ namespace CSV_Merger_Tool
             InitializeComponent();
         }
 
+        #region UI
         private void UpdateMergeButton()
         {
             BtnClearNew.IsEnabled = !string.IsNullOrEmpty(newCsvPath);
@@ -181,7 +182,7 @@ namespace CSV_Merger_Tool
             oldCsvPath = null;
             TxtOldCsv.Text = "Перетягніть старий CSV із перекладом";
             borderOld.BorderBrush = Brushes.Gray;
-            borderNew.Background = (SolidColorBrush)new BrushConverter().ConvertFrom("#FAFAFA");
+            borderOld.Background = (SolidColorBrush)new BrushConverter().ConvertFrom("#FAFAFA");
             UpdateMergeButton();
         }
 
@@ -195,6 +196,100 @@ namespace CSV_Merger_Tool
             {
                 MergeByText();
             }
+        }
+        #endregion
+
+        #region CSV Merging Logic
+        private CsvConfiguration CreateCsvConfig()
+        {
+            return new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                Encoding = Encoding.UTF8,
+                PrepareHeaderForMatch = args => args.Header,
+                ShouldQuote = _ => true,
+                MissingFieldFound = null,
+                BadDataFound = null
+            };
+        }
+
+        private List<(string value, int count)> GetConsecutiveGroups(string csvPath, string fieldName, CsvConfiguration config)
+        {
+            var groups = new List<(string value, int count)>();
+
+            using (var reader = new StreamReader(csvPath, Encoding.UTF8))
+            using (var csvReader = new CsvReader(reader, config))
+            {
+                csvReader.Read();
+                csvReader.ReadHeader();
+
+                string currentValue = null;
+                int currentCount = 0;
+
+                while (csvReader.Read())
+                {
+                    string value = csvReader.GetField(fieldName) ?? string.Empty;
+
+                    if (value == currentValue)
+                    {
+                        currentCount++;
+                    }
+                    else
+                    {
+                        if (currentValue != null)
+                        {
+                            groups.Add((currentValue, currentCount));
+                        }
+                        currentValue = value;
+                        currentCount = 1;
+                    }
+                }
+
+                if (currentValue != null)
+                {
+                    groups.Add((currentValue, currentCount));
+                }
+            }
+
+            return groups;
+        }
+
+        private Dictionary<string, Queue<string>> DistributeTranslations(
+    List<(string value, int count)> groups,
+    Dictionary<string, List<string>> translations,
+    StringComparer comparer)
+        {
+            var assignments = new Dictionary<string, Queue<string>>(comparer);
+
+            foreach (var group in groups)
+            {
+                if (!assignments.ContainsKey(group.value))
+                {
+                    assignments[group.value] = new Queue<string>();
+                }
+
+                if (translations.ContainsKey(group.value))
+                {
+                    var translationList = translations[group.value];
+                    int translationsCount = translationList.Count;
+
+                    if (translationsCount > 0)
+                    {
+                        int perTranslation = group.count / translationsCount;
+                        int remainder = group.count % translationsCount;
+
+                        for (int i = 0; i < translationsCount; i++)
+                        {
+                            int countForThis = perTranslation + (i < remainder ? 1 : 0);
+                            for (int j = 0; j < countForThis; j++)
+                            {
+                                assignments[group.value].Enqueue(translationList[i]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return assignments;
         }
 
         private void MergeByID()
@@ -213,14 +308,7 @@ namespace CSV_Merger_Tool
                     return;
                 }
 
-                var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-                {
-                    Encoding = Encoding.UTF8,
-                    PrepareHeaderForMatch = args => args.Header,
-                    ShouldQuote = _ => true,
-                    MissingFieldFound = null,
-                    BadDataFound = null
-                };
+                var config = CreateCsvConfig();
 
                 var oldData = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
                 using (var reader = new StreamReader(oldCsvPath, Encoding.UTF8))
@@ -256,70 +344,8 @@ namespace CSV_Merger_Tool
                     }
                 }
 
-                var keyGroups = new List<(string key, int count)>();
-                using (var reader = new StreamReader(newCsvPath, Encoding.UTF8))
-                using (var csvReader = new CsvReader(reader, config))
-                {
-                    csvReader.Read();
-                    csvReader.ReadHeader();
-
-                    string currentKey = null;
-                    int currentCount = 0;
-
-                    while (csvReader.Read())
-                    {
-                        string key = csvReader.GetField("key") ?? string.Empty;
-
-                        if (key == currentKey)
-                        {
-                            currentCount++;
-                        }
-                        else
-                        {
-                            if (currentKey != null)
-                            {
-                                keyGroups.Add((currentKey, currentCount));
-                            }
-                            currentKey = key;
-                            currentCount = 1;
-                        }
-                    }
-
-                    if (currentKey != null)
-                    {
-                        keyGroups.Add((currentKey, currentCount));
-                    }
-                }
-
-                var translationAssignments = new Dictionary<string, Queue<string>>(StringComparer.OrdinalIgnoreCase);
-                foreach (var group in keyGroups)
-                {
-                    if (!translationAssignments.ContainsKey(group.key))
-                    {
-                        translationAssignments[group.key] = new Queue<string>();
-                    }
-
-                    if (oldData.ContainsKey(group.key))
-                    {
-                        var translations = oldData[group.key];
-                        int translationsCount = translations.Count;
-
-                        if (translationsCount > 0)
-                        {
-                            int perTranslation = group.count / translationsCount;
-                            int remainder = group.count % translationsCount;
-
-                            for (int i = 0; i < translationsCount; i++)
-                            {
-                                int countForThis = perTranslation + (i < remainder ? 1 : 0);
-                                for (int j = 0; j < countForThis; j++)
-                                {
-                                    translationAssignments[group.key].Enqueue(translations[i]);
-                                }
-                            }
-                        }
-                    }
-                }
+                var keyGroups = GetConsecutiveGroups(newCsvPath, "key", config);
+                var translationAssignments = DistributeTranslations(keyGroups, oldData, StringComparer.OrdinalIgnoreCase);
 
                 SaveFileDialog saveDlg = new SaveFileDialog
                 {
@@ -381,9 +407,7 @@ namespace CSV_Merger_Tool
                         csvWriter.NextRecord();
                     }
 
-                    MessageBox.Show(
-                        $"Режим: за ID.\nПеренесено рядків: {updatedCount}\nФайл успішно збережено.",
-                        "Успіх", MessageBoxButton.OK);
+                    MessageBox.Show($"Режим: за ID.\nПеренесено рядків: {updatedCount}\nФайл успішно збережено.", "Успіх", MessageBoxButton.OK);
                 }
             }
             catch (IOException ex)
@@ -416,16 +440,9 @@ namespace CSV_Merger_Tool
                     return;
                 }
 
-                var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-                {
-                    Encoding = Encoding.UTF8,
-                    PrepareHeaderForMatch = args => args.Header,
-                    ShouldQuote = _ => true,
-                    MissingFieldFound = null,
-                    BadDataFound = null
-                };
+                var config = CreateCsvConfig();
 
-                var oldTranslations = new Dictionary<string, string>(StringComparer.Ordinal);
+                var oldTranslations = new Dictionary<string, List<string>>(StringComparer.Ordinal);
                 using (var reader = new StreamReader(oldCsvPath, Encoding.UTF8))
                 using (var csv = new CsvReader(reader, config))
                 {
@@ -452,10 +469,21 @@ namespace CSV_Merger_Tool
 
                         if (!string.IsNullOrWhiteSpace(source))
                         {
-                            oldTranslations[source] = translation ?? string.Empty;
+                            if (!oldTranslations.ContainsKey(source))
+                            {
+                                oldTranslations[source] = new List<string>();
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(translation))
+                            {
+                                oldTranslations[source].Add(translation);
+                            }
                         }
                     }
                 }
+
+                var sourceGroups = GetConsecutiveGroups(newCsvPath, "source", config);
+                var translationAssignments = DistributeTranslations(sourceGroups, oldTranslations, StringComparer.Ordinal);
 
                 SaveFileDialog saveDlg = new SaveFileDialog
                 {
@@ -503,14 +531,12 @@ namespace CSV_Merger_Tool
 
                         string source = record.ContainsKey("source") ? record["source"] : null;
 
-                        if (!string.IsNullOrWhiteSpace(source) && oldTranslations.ContainsKey(source))
+                        if (!string.IsNullOrWhiteSpace(source) &&
+                            translationAssignments.ContainsKey(source) &&
+                            translationAssignments[source].Count > 0)
                         {
-                            string oldTranslation = oldTranslations[source];
-                            if (!string.IsNullOrWhiteSpace(oldTranslation))
-                            {
-                                record["Translation"] = oldTranslation;
-                                updatedCount++;
-                            }
+                            record["Translation"] = translationAssignments[source].Dequeue();
+                            updatedCount++;
                         }
 
                         foreach (var h in headers)
@@ -520,10 +546,7 @@ namespace CSV_Merger_Tool
                         csvWriter.NextRecord();
                     }
 
-                    MessageBox.Show(
-                        $"Режим: за оригінальним текстом.\nПеренесено рядків: {updatedCount}\nФайл успішно збережено.",
-                        "Успіх",
-                        MessageBoxButton.OK);
+                    MessageBox.Show($"Режим: за оригінальним текстом.\nПеренесено рядків: {updatedCount}\nФайл успішно збережено.", "Успіх", MessageBoxButton.OK);
                 }
             }
             catch (IOException ex)
@@ -539,5 +562,6 @@ namespace CSV_Merger_Tool
                 MessageBox.Show($"{ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        #endregion
     }
 }
