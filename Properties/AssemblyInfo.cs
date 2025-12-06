@@ -12,7 +12,7 @@ using System.Windows;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Hikaro")]
 [assembly: AssemblyProduct("CSV Merger Tool")]
-[assembly: AssemblyCopyright("Copyright © 2025 Hikaro ")]
+[assembly: AssemblyCopyright("Copyright © 2025 Hikaro")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -48,5 +48,5 @@ using System.Windows;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("1.2")]
-[assembly: AssemblyFileVersion("1.2")]
+[assembly: AssemblyVersion("1.3")]
+[assembly: AssemblyFileVersion("1.3")]

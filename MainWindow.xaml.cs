@@ -222,7 +222,7 @@ namespace CSV_Merger_Tool
                     BadDataFound = null
                 };
 
-                var oldData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var oldData = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
                 using (var reader = new StreamReader(oldCsvPath, Encoding.UTF8))
                 using (var csv = new CsvReader(reader, config))
                 {
@@ -239,11 +239,84 @@ namespace CSV_Merger_Tool
                     while (csv.Read())
                     {
                         string key = csv.GetField("key");
-                        string source = csv.GetField("source");
+                        string translation = csv.GetField("Translation");
 
                         if (!string.IsNullOrWhiteSpace(key))
                         {
-                            oldData[key] = source ?? string.Empty;
+                            if (!oldData.ContainsKey(key))
+                            {
+                                oldData[key] = new List<string>();
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(translation))
+                            {
+                                oldData[key].Add(translation);
+                            }
+                        }
+                    }
+                }
+
+                var keyGroups = new List<(string key, int count)>();
+                using (var reader = new StreamReader(newCsvPath, Encoding.UTF8))
+                using (var csvReader = new CsvReader(reader, config))
+                {
+                    csvReader.Read();
+                    csvReader.ReadHeader();
+
+                    string currentKey = null;
+                    int currentCount = 0;
+
+                    while (csvReader.Read())
+                    {
+                        string key = csvReader.GetField("key") ?? string.Empty;
+
+                        if (key == currentKey)
+                        {
+                            currentCount++;
+                        }
+                        else
+                        {
+                            if (currentKey != null)
+                            {
+                                keyGroups.Add((currentKey, currentCount));
+                            }
+                            currentKey = key;
+                            currentCount = 1;
+                        }
+                    }
+
+                    if (currentKey != null)
+                    {
+                        keyGroups.Add((currentKey, currentCount));
+                    }
+                }
+
+                var translationAssignments = new Dictionary<string, Queue<string>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var group in keyGroups)
+                {
+                    if (!translationAssignments.ContainsKey(group.key))
+                    {
+                        translationAssignments[group.key] = new Queue<string>();
+                    }
+
+                    if (oldData.ContainsKey(group.key))
+                    {
+                        var translations = oldData[group.key];
+                        int translationsCount = translations.Count;
+
+                        if (translationsCount > 0)
+                        {
+                            int perTranslation = group.count / translationsCount;
+                            int remainder = group.count % translationsCount;
+
+                            for (int i = 0; i < translationsCount; i++)
+                            {
+                                int countForThis = perTranslation + (i < remainder ? 1 : 0);
+                                for (int j = 0; j < countForThis; j++)
+                                {
+                                    translationAssignments[group.key].Enqueue(translations[i]);
+                                }
+                            }
                         }
                     }
                 }
@@ -287,16 +360,13 @@ namespace CSV_Merger_Tool
                         }
 
                         string key = record.ContainsKey("key") ? record["key"] : null;
-                        string sourceNew = record.ContainsKey("source") ? record["source"] : null;
 
-                        if (!string.IsNullOrWhiteSpace(key) && oldData.ContainsKey(key))
+                        if (!string.IsNullOrWhiteSpace(key) &&
+                            translationAssignments.ContainsKey(key) &&
+                            translationAssignments[key].Count > 0)
                         {
-                            string sourceOld = oldData[key];
-                            if (!string.IsNullOrWhiteSpace(sourceOld) && sourceNew != sourceOld && record.ContainsKey("Translation"))
-                            {
-                                record["Translation"] = sourceOld;
-                                updatedCount++;
-                            }
+                            record["Translation"] = translationAssignments[key].Dequeue();
+                            updatedCount++;
                         }
 
                         foreach (var h in headers)
