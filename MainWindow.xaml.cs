@@ -239,7 +239,7 @@ namespace CSV_Merger_Tool
                     while (csv.Read())
                     {
                         string key = csv.GetField("key");
-                        string translation = csv.GetField("Translation");
+                        string source = csv.GetField("source");
 
                         if (!string.IsNullOrWhiteSpace(key))
                         {
@@ -248,9 +248,9 @@ namespace CSV_Merger_Tool
                                 oldData[key] = new List<string>();
                             }
 
-                            if (!string.IsNullOrWhiteSpace(translation))
+                            if (!string.IsNullOrWhiteSpace(source))
                             {
-                                oldData[key].Add(translation);
+                                oldData[key].Add(source);
                             }
                         }
                     }
@@ -360,13 +360,18 @@ namespace CSV_Merger_Tool
                         }
 
                         string key = record.ContainsKey("key") ? record["key"] : null;
+                        string sourceNew = record.ContainsKey("source") ? record["source"] : null;
 
                         if (!string.IsNullOrWhiteSpace(key) &&
                             translationAssignments.ContainsKey(key) &&
                             translationAssignments[key].Count > 0)
                         {
-                            record["Translation"] = translationAssignments[key].Dequeue();
-                            updatedCount++;
+                            string sourceOld = translationAssignments[key].Dequeue();
+                            if (sourceNew != sourceOld && record.ContainsKey("Translation"))
+                            {
+                                record["Translation"] = sourceOld;
+                                updatedCount++;
+                            }
                         }
 
                         foreach (var h in headers)
